@@ -1,13 +1,41 @@
 from django.conf.urls import url
-from django.shortcuts import HttpResponse
+from django.shortcuts import HttpResponse,render
 
 class TigaConfig(object):
+    list_display=[]
     def __init__(self,model_class,site):
         self.model_class=model_class
         self.site=site
 
     def changlist_view(self,request,*args,**kwargs):
-        return HttpResponse("list")
+        head_list=[]
+        for field_name in self.list_display:
+            if isinstance(field_name,str):
+                verbose_name=self.model_class._meta.get_field(field_name).verbose_name
+            else:
+                verbose_name=field_name(self,is_head=True)
+
+            head_list.append(verbose_name)
+
+
+
+        data_list=self.model_class.objects.all()
+        print(data_list)
+        new_data_list=[]
+        for dataObj in data_list:
+            tem=[]
+            for field_name in self.list_display:
+                if isinstance(field_name,str):
+                    val=getattr(dataObj,field_name)
+                else:
+                    val=field_name(self,dataObj)
+
+                tem.append(val)
+            new_data_list.append(tem)
+
+
+        print(new_data_list)
+        return render(request,'stark/changelist.html',{'new_data_list':new_data_list,'head_list':head_list})
 
     def add_view(self,request,*args,**kwargs):
         return HttpResponse("add")
