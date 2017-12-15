@@ -1,0 +1,19 @@
+
+<form class="form-horizontal" novalidate method="post">
+    {% csrf_token %}
+    {% for fields in form %}
+        <div class="col-sm-6">
+    <div class="form-group">
+    <label for="inputEmail3" class="col-sm-2 control-label">{{ fields.label }}</label>
+    <div class="col-sm-10">
+      {{ fields }}{{ fields.errors.0 }}
+    </div>
+  </div>
+        </div>
+    {% endfor %}
+  <div class="form-group">
+    <div class="col-sm-offset-11 col-sm-1">
+        <input type="submit" class="btn btn-primary">
+    </div>
+  </div>
+</form>

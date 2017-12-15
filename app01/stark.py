@@ -1,20 +1,23 @@
 from app01 import  models
 from django.utils.safestring import mark_safe
 from stark.service import v1
+from django.forms import  ModelForm
+
+class UserinfoForm(ModelForm):
+   class Meta:
+      model=models.Userinfo
+      fields='__all__'
+      error_messages={
+          "name":{"required":'用户名不能为空'},
+          "addr":{'required':"地址不能为空"}
+       }
 
 class UserInfoConfig(v1.TigaConfig):
-   def checkbox(self,obj=None,is_head=False):
-       if is_head:
-           return '选择'
 
-       return mark_safe("<input type='checkbox' name='pk' value='%s'>"%(obj.id,))
+   list_display = ['id','name','addr','email']
 
-   def edit(self,obj=None,is_head=False):
-       if is_head:
-           return '编辑'
-       return mark_safe("<a href='/edit/%s/'>编辑</a>"%(obj.id,))
+   model_class_form=UserinfoForm
 
-   list_display = [checkbox,'id','name','addr',edit]
 v1.site.register(models.Userinfo,UserInfoConfig)
 
 
@@ -26,3 +29,29 @@ v1.site.register(models.UserType,UserTypeConfig)
 class RoleConfig(v1.TigaConfig):
    list_display = ['id','caption']
 v1.site.register(models.Role,RoleConfig)
+
+
+
+
+#主要是为了测试
+class HostForm(ModelForm):
+   class Meta:
+      model=models.Host
+      fields='__all__'
+
+      error_messages={
+         'hostname':{"required":"主机名不能为空"},
+         'ip':{"required":"ip不能为空"},
+         'port':{"required":"port不能为空"}
+      }
+
+
+class HostConfig(v1.TigaConfig):
+   def ip_port(self,obj=None,is_head=False):
+      if is_head:
+         return 'ip和端口'
+      return '%s_%s'%(obj.ip,obj.port)
+
+   list_display = ['hostname','ip','port',ip_port]
+   model_class_form=HostForm
+v1.site.register(models.Host,HostConfig)
