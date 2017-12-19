@@ -3,12 +3,30 @@ from django.shortcuts import HttpResponse,render,redirect
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 from django.forms import ModelForm
+from django.http import QueryDict
+
+
 from utils.pager import Pagination
 class StarkConfig(object):
     list_display=[]
     def __init__(self,model_class,site):
         self.model_class=model_class
         self.site=site
+
+        # 保存搜索条件传入的参数，比如修改后调回当前页 而不是 首页
+        self._query_param_key = '_listfilter'
+        #request参数
+        self.request=None
+        
+#-----------------------------------获取request编写的装饰器-----------------------------------------        
+    # 为了获取request，方便在edit add delete 中获取request.GET
+    def wrap(self,view_func):
+        def inner(request,*args,**kwargs):
+            self.request=request
+            return view_func(request,*args,**kwargs)
+        return inner
+#-------------------------------------获取request编写的装饰器结束----------------------------------------------------------
+
 
 #-----------------------------------权限相关-----------------------------------------------------
     add_btn=True
@@ -29,13 +47,19 @@ class StarkConfig(object):
     def edit(self, obj=None, is_head=False):
         if is_head:
             return '编辑'
-        return mark_safe("<a href='%s'>编辑</a>" % self.get_change_url(obj.id))
+        parms=QueryDict(mutable=True)
+        query_url=self.request.GET.urlencode()
+        parms[self._query_param_key]=query_url
+        return mark_safe("<a href='%s?%s'>编辑</a>" % (self.get_change_url(obj.id),parms.urlencode()))
 
     #删除
     def delete(self,obj=None,is_head=False):
         if is_head:
             return '删除'
-        return  mark_safe("<a href='%s'>删除</a>" % self.get_delete_url(obj.id))
+        parms = QueryDict(mutable=True)
+        query_url = self.request.GET.urlencode()
+        parms[self._query_param_key] = query_url
+        return  mark_safe("<a href='%s?%s'>删除</a>" % (self.get_delete_url(obj.id),parms.urlencode()))
 
     #列表页面展示字段
     def get_list_display(self):
@@ -58,10 +82,10 @@ class StarkConfig(object):
     def get_urls(self):
         model_class_app = (self.model_class._meta.app_label, self.model_class._meta.model_name)
         urlpatterns = [
-            url(r'^$', self.changlist_view, name='%s_%s_changelist' % model_class_app),
-            url(r'^add/$', self.add_view, name='%s_%s_add' % model_class_app),
-            url(r'^(\d+)/change/$', self.chang_view, name='%s_%s_change' % model_class_app),
-            url(r'^(\d+)/delete/$', self.delete_view, name='%s_%s_delete' % model_class_app)
+            url(r'^$', self.wrap(self.changlist_view), name='%s_%s_changelist' % model_class_app),
+            url(r'^add/$', self.wrap(self.add_view), name='%s_%s_add' % model_class_app),
+            url(r'^(\d+)/change/$',self.wrap(self.chang_view) , name='%s_%s_change' % model_class_app),
+            url(r'^(\d+)/delete/$', self.wrap(self.delete_view), name='%s_%s_delete' % model_class_app)
         ]
         urlpatterns.extend(self.extra_url())
         return urlpatterns
@@ -75,22 +99,22 @@ class StarkConfig(object):
         return self.get_urls()
 
     def get_list_url(self):
-        name = 'tiga:%s_%s_changelist' % (self.model_class._meta.app_label, self.model_class._meta.model_name)
+        name = 'stark:%s_%s_changelist' % (self.model_class._meta.app_label, self.model_class._meta.model_name)
         list_url = reverse(name)
         return list_url
 
     def get_add_url(self):
-        name = 'tiga:%s_%s_add' % (self.model_class._meta.app_label, self.model_class._meta.model_name)
+        name = 'stark:%s_%s_add' % (self.model_class._meta.app_label, self.model_class._meta.model_name)
         add_url = reverse(name)
         return add_url
 
     def get_change_url(self, nid):
-        name = 'tiga:%s_%s_change' % (self.model_class._meta.app_label, self.model_class._meta.model_name)
+        name = 'stark:%s_%s_change' % (self.model_class._meta.app_label, self.model_class._meta.model_name)
         edit_url = reverse(name, args=(nid,))
         return edit_url
 
     def get_delete_url(self, nid):
-        name = 'tiga:%s_%s_delete' % (self.model_class._meta.app_label, self.model_class._meta.model_name)
+        name = 'stark:%s_%s_delete' % (self.model_class._meta.app_label, self.model_class._meta.model_name)
         del_url = reverse(name, args=(nid,))
         return del_url
 
@@ -145,7 +169,7 @@ class StarkConfig(object):
             new_data_list.append(tem)
 
 
-        print(new_data_list)
+
         return render(request,'stark/changelist.html',{'new_data_list':new_data_list,'head_list':head_list,'add_url':self.get_add_url(),'add_btn':self.get_add_btn(),"page_html":page_html})
 
         #另一种方法用yield实现
@@ -222,7 +246,10 @@ class StarkConfig(object):
            form=EditForm(instance=obj,data=request.POST)
            if form.is_valid():
                form.save()
-               return redirect(self.get_list_url())
+               print(request.GET)
+               list_query_str=request.GET.get(self._query_param_key)
+               list_url='%s?%s'%(self.get_list_url(),list_query_str)
+               return redirect(list_url)
            return render(request, 'stark/edit.html', {"form": form})
 
     #删除视图
@@ -255,7 +282,7 @@ class StarkSite(object):
 
     @property
     def urls(self):
-        return (self.get_urls(),None,'tiga')
+        return (self.get_urls(),None,'stark')
 
 
 
