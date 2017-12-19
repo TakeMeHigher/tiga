@@ -12,36 +12,54 @@
 <div class="container">
     <h1>列表页面</h1>
     {% if cl.add_btn %}
-     <a href="{{ cl.add_url }}"><button class="btn btn-primary">添加</button></a>
+        <p>
+            <a href="{{ cl.add_url }}">
+                <button class="btn btn-primary">添加</button>
+            </a>
+        </p>
     {% endif %}
+
+{% if cl.show_search_form %}
+  <form method="get" style="padding-left:0;">
+        <div class="form-group" style="display: inline-block">
+            <input type="text" name="{{ cl.config.search_key }}" value="{{ cl.search_form_val }}" class="form-control" placeholder="Search"  style="width:200px">
+
+        </div>
+         <button type="submit" class="btn btn-primary"><span class="glyphicon glyphicon-search"></span></button>
+
+    </form>
+
+{% endif %}
 
     <table class="table table-bordered">
         <thead>
-         <tr>
-             {% for head in cl.head_list %}
-               <th>{{ head }}</th>
-             {% endfor %}
+        <tr>
+            {% for head in cl.head_list %}
+                <th>{{ head }}</th>
+            {% endfor %}
 
-         </tr>
+        </tr>
         </thead>
         <tbody>
-           {% for data_list in cl.body_list %}
-               <tr>
+        {% for data_list in cl.body_list %}
+            <tr>
                 {% for data in data_list %}
-                  <td> {{ data }}</td>
+                    <td> {{ data }}</td>
                 {% endfor %}
 
-               </tr>
-           {% endfor %}
+            </tr>
+        {% endfor %}
 
         </tbody>
     </table>
 
-     <nav aria-label="Page navigation">
-            <ul class="pagination ">
-                {{cl.pageObj.page_html|safe }}
-            </ul>
-       </nav>
+    <nav aria-label="Page navigation">
+        <ul class="pagination ">
+            {{ cl.pageObj.page_html|safe }}
+        </ul>
+    </nav>
+
+
 </div>
 </body>
 </html>

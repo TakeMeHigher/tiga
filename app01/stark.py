@@ -14,15 +14,18 @@ class UserinfoForm(ModelForm):
 
 class UserInfoConfig(v1.StarkConfig):
 
+
    list_display = ['id','name','addr','email']
 
    model_class_form=UserinfoForm
-
+   show_search_form=True
+   search_fileds = ['name__contains', 'email__contains']
 v1.site.register(models.Userinfo,UserInfoConfig)
 
 
 class UserTypeConfig(v1.StarkConfig):
    list_display = ['id','name']
+   show_search_form = True
 v1.site.register(models.UserType,UserTypeConfig)
 
 
