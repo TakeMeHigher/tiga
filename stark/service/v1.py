@@ -3,7 +3,8 @@ from django.shortcuts import HttpResponse,render,redirect
 from django.utils.safestring import mark_safe
 from django.urls import reverse
 from django.forms import ModelForm
-class TigaConfig(object):
+from utils.pager import Pagination
+class StarkConfig(object):
     list_display=[]
     def __init__(self,model_class,site):
         self.model_class=model_class
@@ -41,9 +42,9 @@ class TigaConfig(object):
         data=[]
         if self.list_display:
             data.extend(self.list_display)
-            data.append(TigaConfig.edit)
-            data.append(TigaConfig.delete)
-            data.insert(0,TigaConfig.checkbox)
+            data.append(StarkConfig.edit)
+            data.append(StarkConfig.delete)
+            data.insert(0, StarkConfig.checkbox)
         return data
 
 
@@ -119,10 +120,13 @@ class TigaConfig(object):
 
         #获取当前类中的所有对象
         data_list=self.model_class.objects.all()
-        print(data_list)
+        pageObj=Pagination(request.GET.get('page',1),len(data_list),request.path_info,request.GET,per_page_count=1)
+
+        per_page_data_list=data_list[pageObj.start:pageObj.end]
+        page_html=pageObj.page_html()
         #存储tr
         new_data_list=[]
-        for dataObj in data_list:
+        for dataObj in per_page_data_list:
             #tr
             tem=[]
             if not self.list_display:
@@ -142,7 +146,7 @@ class TigaConfig(object):
 
 
         print(new_data_list)
-        return render(request,'stark/changelist.html',{'new_data_list':new_data_list,'head_list':head_list,'add_url':self.get_add_url(),'add_btn':self.get_add_btn()})
+        return render(request,'stark/changelist.html',{'new_data_list':new_data_list,'head_list':head_list,'add_url':self.get_add_url(),'add_btn':self.get_add_btn(),"page_html":page_html})
 
         #另一种方法用yield实现
         # thead名称
@@ -229,13 +233,13 @@ class TigaConfig(object):
 #-------------------------------------视图函数结束-------------------------------------------------------
 
 
-class TigaSite(object):
+class StarkSite(object):
     def __init__(self):
         self._registry={}
 
     def register(self,model_class,tiga_config_class=None):
         if not tiga_config_class:
-            tiga_config_class=TigaConfig
+            tiga_config_class=StarkConfig
         self._registry[model_class]=tiga_config_class(model_class,self)
 
     def get_urls(self):
@@ -255,4 +259,4 @@ class TigaSite(object):
 
 
 
-site=TigaSite()
+site=StarkSite()

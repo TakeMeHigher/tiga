@@ -12,7 +12,7 @@ class UserinfoForm(ModelForm):
           "addr":{'required':"地址不能为空"}
        }
 
-class UserInfoConfig(v1.TigaConfig):
+class UserInfoConfig(v1.StarkConfig):
 
    list_display = ['id','name','addr','email']
 
@@ -21,12 +21,12 @@ class UserInfoConfig(v1.TigaConfig):
 v1.site.register(models.Userinfo,UserInfoConfig)
 
 
-class UserTypeConfig(v1.TigaConfig):
+class UserTypeConfig(v1.StarkConfig):
    list_display = ['id','name']
 v1.site.register(models.UserType,UserTypeConfig)
 
 
-class RoleConfig(v1.TigaConfig):
+class RoleConfig(v1.StarkConfig):
    list_display = ['id','caption']
 v1.site.register(models.Role,RoleConfig)
 
@@ -46,7 +46,7 @@ class HostForm(ModelForm):
       }
 
 
-class HostConfig(v1.TigaConfig):
+class HostConfig(v1.StarkConfig):
    def ip_port(self,obj=None,is_head=False):
       if is_head:
          return 'ip和端口'
