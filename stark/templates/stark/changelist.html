@@ -7,10 +7,33 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Title</title>
     <link rel="stylesheet" href="{% static '/stark/bootstrap/css/bootstrap.min.css' %}">
+    <style>
+        .list-filter a{
+            display: inline-block;
+            padding: 3px 6px;
+            border: 1px solid #2e6da4;
+            margin: 3px 0;
+        }
+        .list-filter a.active{
+            background-color: #2e6da4;
+            color: white;
+        }
+    </style>
 </head>
 <body>
 <div class="container">
     <h1>列表页面</h1>
+     <div class="list-filter">
+        {% for filter_row in  cl.get_combine_seach_filter %}
+            <div>
+                {% for col in filter_row  %}
+                    {{ col }}
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+
+
     {% if cl.add_btn %}
         <p>
             <a href="{{ cl.add_url }}">
@@ -19,40 +42,57 @@
         </p>
     {% endif %}
 
-{% if cl.show_search_form %}
-  <form method="get" style="padding-left:0;">
-        <div class="form-group" style="display: inline-block">
-            <input type="text" name="{{ cl.config.search_key }}" value="{{ cl.search_form_val }}" class="form-control" placeholder="Search"  style="width:200px">
+    {% if cl.show_search_form %}
+        <form method="get" style="padding-left:0;">
+            <div class="form-group" style="display: inline-block">
+                <input type="text" name="{{ cl.config.search_key }}" value="{{ cl.search_form_val }}"
+                       class="form-control" placeholder="Search" style="width:200px">
 
-        </div>
-         <button type="submit" class="btn btn-primary"><span class="glyphicon glyphicon-search"></span></button>
+            </div>
+            <button type="submit" class="btn btn-primary"><span class="glyphicon glyphicon-search"></span></button>
 
-    </form>
+        </form>
 
-{% endif %}
+    {% endif %}
 
-    <table class="table table-bordered">
-        <thead>
-        <tr>
-            {% for head in cl.head_list %}
-                <th>{{ head }}</th>
-            {% endfor %}
+    <form method="post">
+    {% csrf_token %}
+        {% if cl.show_action %}
+            <div class="form-group">
+                <select name="list_action" class="form-control" style="display:inline-block;width: 200px;">
+                    {% for item in cl.modify_actions %}
+                        <option value="{{ item.name }}">{{ item.text }}</option>
+                    {% endfor %}
 
-        </tr>
-        </thead>
-        <tbody>
-        {% for data_list in cl.body_list %}
+                </select>
+                <button class="btn btn-primary">执行</button>
+            </div>
+        {% endif %}
+
+
+
+        <table class="table table-bordered">
+            <thead>
             <tr>
-                {% for data in data_list %}
-                    <td> {{ data }}</td>
+                {% for head in cl.head_list %}
+                    <th>{{ head }}</th>
                 {% endfor %}
 
             </tr>
-        {% endfor %}
+            </thead>
+            <tbody>
+            {% for data_list in cl.body_list %}
+                <tr>
+                    {% for data in data_list %}
+                        <td> {{ data }}</td>
+                    {% endfor %}
 
-        </tbody>
-    </table>
+                </tr>
+            {% endfor %}
 
+            </tbody>
+        </table>
+    </form>
     <nav aria-label="Page navigation">
         <ul class="pagination ">
             {{ cl.pageObj.page_html|safe }}

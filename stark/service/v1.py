@@ -1,3 +1,5 @@
+import copy
+
 from django.conf.urls import url
 from django.shortcuts import HttpResponse, render, redirect
 from django.utils.safestring import mark_safe
@@ -5,8 +7,89 @@ from django.urls import reverse
 from django.forms import ModelForm
 from django.http import QueryDict
 from django.db.models import Q
+from django.db.models import ForeignKey, ManyToManyField
 
 from utils.pager import Pagination
+
+
+class FilterOption(object):
+    def __init__(self, field_name, is_choice=False, is_multi=False, condition=None):
+        """
+
+                :param field_name: 字段
+                :param multi:  是否多选
+                :param condition: 显示数据的筛选条件
+                :param is_choice: 是否是choice
+                """
+        self.field_name = field_name
+        self.is_choice = is_choice
+        self.is_multi = is_multi
+        self.condition = condition
+
+    # 针对外键和多对多 根据condition筛选出当前model对象所关联的其他model对象
+    def get_queryset(self, _field):
+        if self.condition:
+            return _field.rel.to.objects.filter(**self.condition).all()
+        return _field.rel.to.objects.all()
+
+    def get_choice(self, _field):
+        return _field.choices
+
+class FilterRow(object):
+    def __init__(self,option,data,request):
+        self.option=option
+        self.data=data
+        self.request=request
+
+
+    def __iter__(self):
+        current_id=self.request.GET.get(self.option.field_name)
+        current_id_list=self.request.GET.getlist(self.option.field_name)
+        params=copy.deepcopy(self.request.GET)
+        params._mutable=True
+        if self.option.field_name in params:
+            origin_list=params.pop(self.option.field_name)
+            url='{0}?{1}'.format(self.request.path_info,params.urlencode())
+
+            yield mark_safe('<a href="{0}">全选</a>'.format(url))
+            params.setlist(self.option.field_name, origin_list)
+        else:
+            url = '{0}?{1}'.format(self.request.path_info, params.urlencode())
+            yield mark_safe('<a href="{0}" class="active">全选</a>'.format(url))
+
+        for val in self.data:
+            if self.option.is_choice:
+                pk,text=str(val[0]),val[1]
+            else:
+                pk,text=str(val.pk),val
+
+            if  not self.option.is_multi:
+                #单选
+                params[self.option.field_name]=pk
+                url='{0}?{1}'.format(self.request.path_info,params.urlencode())
+                if pk ==current_id:
+                    yield mark_safe('<a href="{0}" class="active">{1}</a>'.format(url,text))
+                else:
+                    yield mark_safe('<a href="{0}">{1}</a>'.format(url, text))
+
+            else:
+                #多选
+                _parms=copy.deepcopy(params)
+                id_list=_parms.getlist(self.option.field_name)
+
+                if pk in current_id_list:
+                    id_list.remove(pk)
+                    _parms.setlist(self.option.field_name,id_list)
+                    url='{0}?{1}'.format(self.request.path_info,_parms.urlencode())
+                    yield mark_safe('<a href="{0}" class="active">{1}</a>'.format(url,text))
+                else:
+                    id_list.append(pk)
+                    _parms.setlist(self.option.field_name,id_list)
+                    url = '{0}?{1}'.format(self.request.path_info, _parms.urlencode())
+                    yield mark_safe('<a href="{0}" >{1}</a>'.format(url, text))
+
+
+
 
 
 # 封装列表页面  因为列表页面代码太多啦 而却有好几个功能
@@ -43,12 +126,19 @@ class ChangeList(object):
         # 是否有添加按钮
         self.add_btn = config.get_add_btn()
 
-        #是否显示搜索框
-        self.show_search_form=config.get_show_search_form()
-        #搜索框的value和url同步
-        self.search_form_val=self.request.GET.get(config.search_key,' ')
+        # 是否显示搜索框
+        self.show_search_form = config.get_show_search_form()
+        # 搜索框的value和url同步
+        self.search_form_val = self.request.GET.get(config.search_key, ' ')
 
+        # 是否显示action(批量操作)
+        self.show_action = config.get_show_action()
 
+        # 获取action_fuc 列表
+        self.action_func_list = config.get_action_func_list()
+
+        # 联合搜索option对象集合
+        self.combine_seach = config.get_combine_seach()
 
     # 获取thead名称
     def head_list(self):
@@ -88,10 +178,29 @@ class ChangeList(object):
             new_data_list.append(tem)
         return new_data_list
 
+    # 将action_func_list改造 便于后台显示
+    def modify_actions(self):
+        result = []
+        for func in self.action_func_list:
+            temp = {"name": func.__name__, "text": func.short_desc}
+            result.append(temp)
+        return result
+
+
+    def get_combine_seach_filter(self):
+
+        for option in self.combine_seach:
+            _field = self.model_class._meta.get_field(option.field_name)
+            if isinstance(_field, ForeignKey):
+                row=FilterRow(option,option.get_queryset(_field),self.request)
+            elif isinstance(_field, ManyToManyField):
+                row=FilterRow(option,option.get_queryset(_field),self.request)
+            else:
+                row=FilterRow(option,option.get_choice(_field),self.request)
+            yield row
+
 
 class StarkConfig(object):
-
-
     def __init__(self, model_class, site):
         self.model_class = model_class
         self.site = site
@@ -101,8 +210,7 @@ class StarkConfig(object):
         # request参数
         self.request = None
 
-
-        self.search_key='_q'
+        self.search_key = '_q'
 
     # -----------------------------------获取request编写的装饰器-----------------------------------------
     # 为了获取request，方便在edit add delete 中获取request.GET
@@ -113,51 +221,85 @@ class StarkConfig(object):
 
         return inner
 
-    # -------------------------------------获取request编写的装饰器结束----------------------------------------------------------
+        # -------------------------------------获取request编写的装饰器结束----------------------------------------------------------
 
 
-    #*********************************************权限相关***************************************************
+        # *********************************************权限相关***************************************************
 
 
 
-   #-----------------------添加按钮-----------------------------------------------------------------------
-    #调用时可以定制
+        # -----------------------添加按钮-----------------------------------------------------------------------
+
+    # 调用时可以定制
     add_btn = True
+
     def get_add_btn(self):
         return self.add_btn
-    #-----------------------------添加按钮结束--------------------------------------------------------------
+
+    # -----------------------------添加按钮结束--------------------------------------------------------------
 
 
-    #-----------------------搜索框-----------------------------------------------------------------------
-    #定制
-    show_search_form=False
+    # -----------------------搜索框-----------------------------------------------------------------------
+    # 定制
+    show_search_form = False
+
     def get_show_search_form(self):
         return self.show_search_form
 
     # 定制
-    search_fileds=[]
+    search_fileds = []
+
     def get_search_fileds(self):
-        data=[]
+        data = []
         if self.search_fileds:
             data.extend(self.search_fileds)
         return data
 
     def get_search_condition(self):
-        key_word=self.request.GET.get(self.search_key)
-        search_fileds=self.get_search_fileds()
-        condition=Q()
-        condition.connector='or'
+        key_word = self.request.GET.get(self.search_key)
+        search_fileds = self.get_search_fileds()
+        condition = Q()
+        condition.connector = 'or'
         if key_word and self.get_show_search_form():
             for filed in search_fileds:
-                condition.children.append((filed,key_word))
+                condition.children.append((filed, key_word))
 
         return condition
 
+    # -----------------------------搜索框结束-----------------------------------------------------------------
+
+
+    # ---------------------------------------------------action-----------------------------------------------------------------
+    # 是否显示action
+    show_action = False
+
+    def get_show_action(self):
+        return self.show_action
+
+    # action_fuc 列表 里面是函数名
+    action_func_list = []
+
+    def get_action_func_list(self):
+        if self.action_func_list:
+            return self.action_func_list
 
 
 
-    #-----------------------------搜索框结束-----------------------------------------------------------------
+            # ---------------------------------------------------action 结束----------------------------------------------------------------
 
+
+
+            # ----------------------------------------------联合搜索---------------------------------------
+
+    combine_seach = []
+
+    def get_combine_seach(self):
+        data = []
+        if self.combine_seach:
+            data.extend(self.combine_seach)
+        return data
+
+    # ----------------------------------------------联合搜锁解锁----------------------------------------------
 
 
     # ****************************************权限相关  结束*********************************************************************
@@ -193,6 +335,7 @@ class StarkConfig(object):
 
     # 列表页面展示字段
     list_display = []
+
     def get_list_display(self):
         data = []
         if self.list_display:
@@ -256,6 +399,7 @@ class StarkConfig(object):
 
     # ---------------------------------视图函数相关------------------------------------------------------------
     model_class_form = None
+
     def get_model_class_form(self):
         if self.model_class_form:
             return self.model_class_form
@@ -269,9 +413,26 @@ class StarkConfig(object):
 
     # 字段列表展示页面视图函数
     def changlist_view(self, request, *args, **kwargs):
+        combine_search_condition={}
+        combine_search_list=self.get_combine_seach()
+        for key in request.GET.keys():
+            value_list=request.GET.getlist(key)
+            flag=False
+            for option in combine_search_list:
+                if option.field_name == key:
+                    flag=True
+                    break
+            if flag:
+                combine_search_condition['%s__in'%key]=value_list
+
 
         # 获取当前类中的所有对象
-        data_list = self.model_class.objects.filter(self.get_search_condition()).all()
+        data_list = self.model_class.objects.filter(self.get_search_condition()).filter(**combine_search_condition).all()
+
+        if request.method == 'POST' and self.get_show_action():
+            func_name_str = request.POST.get('list_action')
+            func = getattr(self, func_name_str)
+            func(request)
 
         cl = ChangeList(self, data_list)
         return render(request, 'stark/changelist.html',
