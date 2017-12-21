@@ -526,12 +526,15 @@ class StarkConfig(object):
             #
             #     new_form.append(temp)
 
+            #这段代码因为edit也要用 就抽取到了自定义标签中
+
             return render(request, 'stark/add.html', {"form": form})
         else:
             form = AddForm(request.POST)
             _popbackid=request.GET.get('_popbackid')
             if form.is_valid():
                 new_obj=form.save()
+                #如果是pop传回的
                 if _popbackid:
                     result={"id":new_obj.id,'text':str(new_obj),'popbackid':_popbackid}
                     return render(request,'stark/popResponse.html',{"result":json.dumps(result,ensure_ascii=False)})
