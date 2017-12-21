@@ -1,4 +1,5 @@
 import copy
+import json
 
 from django.conf.urls import url
 from django.shortcuts import HttpResponse, render, redirect
@@ -48,6 +49,7 @@ class FilterRow(object):
         params=copy.deepcopy(self.request.GET)
         params._mutable=True
         if self.option.field_name in params:
+            #为了拼接全选url先给他删了后面加上
             origin_list=params.pop(self.option.field_name)
             url='{0}?{1}'.format(self.request.path_info,params.urlencode())
 
@@ -78,6 +80,7 @@ class FilterRow(object):
                 id_list=_parms.getlist(self.option.field_name)
 
                 if pk in current_id_list:
+                    #删了以后当前已经选中的url里面没有自己的id了，目的是为了再点一次就取消
                     id_list.remove(pk)
                     _parms.setlist(self.option.field_name,id_list)
                     url='{0}?{1}'.format(self.request.path_info,_parms.urlencode())
@@ -186,7 +189,7 @@ class ChangeList(object):
             result.append(temp)
         return result
 
-
+    #
     def get_combine_seach_filter(self):
 
         for option in self.combine_seach:
@@ -228,7 +231,7 @@ class StarkConfig(object):
 
 
 
-        # -----------------------添加按钮-----------------------------------------------------------------------
+        # ---------------------------------添加按钮-----------------------------------------------------------------------
 
     # 调用时可以定制
     add_btn = True
@@ -292,7 +295,7 @@ class StarkConfig(object):
             # ----------------------------------------------联合搜索---------------------------------------
 
     combine_seach = []
-
+   #联合搜索对应额option对象list
     def get_combine_seach(self):
         data = []
         if self.combine_seach:
@@ -480,11 +483,58 @@ class StarkConfig(object):
         AddForm = self.get_model_class_form()
         if request.method == 'GET':
             form = AddForm()
+            # '''
+            # for bfield in form:
+            #     print(bfield.field, '--------------', type(bfield.field))
+            # <django.forms.fields.CharField object at 0x00000179480E6F60> -------------- <class 'django.forms.fields.CharField'>
+            # <django.forms.fields.CharField object at 0x00000179480E6FD0> -------------- <class 'django.forms.fields.CharField'>
+            # <django.forms.fields.TypedChoiceField object at 0x00000179480F5048> -------------- <class 'django.forms.fields.TypedChoiceField'>
+            # <django.forms.models.ModelChoiceField object at 0x00000179480F50B8> -------------- <class 'django.forms.models.ModelChoiceField'>
+            # <django.forms.models.ModelMultipleChoiceField object at 0x00000179480F5128> -------------- <class 'django.forms.models.ModelMultipleChoiceField'>
+            # '''
+            #
+            #
+            # ''''
+            # #bfield.field.queryset
+            # <QuerySet [<Department: 教育部>, <Department: 销售部>]>
+            # <QuerySet [<Role: 老师>, <Role: 学生>]>
+            # '''
+            #
+            # '''
+            # #bfield.field.queryset.model
+            # <class 'app03.models.Department'>
+            # <class 'app03.models.Role'>
+            # '''
+            #
+            # '''
+            # #bfield.auto_id
+            # id_depart
+            # id_roles
+            # '''
+            # new_form=[]
+            # for bfield in form:
+            #     temp={"is_popup":False,"bfiled":bfield}
+            #     from django.forms import  ModelChoiceField
+            #     if isinstance(bfield.field,ModelChoiceField):
+            #         relate_class_name=bfield.field.queryset.model
+            #         if relate_class_name in site._registry:
+            #             app_model_name=relate_class_name._meta.app_label,relate_class_name._meta.model_name
+            #             baseurl=reverse('stark:%s_%s_add'%app_model_name)
+            #             popurl='%s?_popbackid=%s'%(baseurl,bfield.auto_id)
+            #             temp["is_popup"]=True
+            #             temp['popurl']=popurl
+            #
+            #     new_form.append(temp)
+
             return render(request, 'stark/add.html', {"form": form})
         else:
             form = AddForm(request.POST)
+            _popbackid=request.GET.get('_popbackid')
             if form.is_valid():
-                form.save()
+                new_obj=form.save()
+                if _popbackid:
+                    result={"id":new_obj.id,'text':str(new_obj),'popbackid':_popbackid}
+                    return render(request,'stark/popResponse.html',{"result":json.dumps(result,ensure_ascii=False)})
                 return redirect(self.get_list_url())
             return render(request, 'stark/add.html', {"form": form})
 

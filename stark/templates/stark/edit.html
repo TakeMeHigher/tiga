@@ -1,4 +1,5 @@
 {% load staticfiles %}
+{% load change_form %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,6 +12,11 @@
 </head>
 <body>
 <h1>编辑页面</h1>
-{%  include 'stark/form.html' %}
+{#{%  include 'stark/form.html' %}#}
+{% form form %}
+
+{#第一个form是自定义标签#}
+{#第2个form是后端传过来的form对象#}
+
 </body>
 </html>
