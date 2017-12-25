@@ -24,6 +24,7 @@ class UserInfoConfig(v1.StarkConfig):
         if is_head:
             return '性别'
         return obj.get_gender_display()
+
     def dispaly_depart(self,obj=None,is_head=False):
         if is_head:
             return '部门'
@@ -53,7 +54,7 @@ class UserInfoConfig(v1.StarkConfig):
     show_action=True
     def multi_del(self,request):
         id_list=request.POST.getlist('pk')
-        print(id_list,'****------')
+        # print(id_list,'****------')
         self.model_class.objects.filter(id__in=id_list).delete()
         return redirect(self.get_list_url())
 

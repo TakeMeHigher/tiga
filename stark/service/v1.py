@@ -14,18 +14,22 @@ from utils.pager import Pagination
 
 
 class FilterOption(object):
-    def __init__(self, field_name, is_choice=False, is_multi=False, condition=None):
+    def __init__(self, field_name, is_choice=False, is_multi=False, condition=None, text_func_name=None,
+                 val_func_name=None):
         """
-
                 :param field_name: 字段
                 :param multi:  是否多选
                 :param condition: 显示数据的筛选条件
                 :param is_choice: 是否是choice
+                :param text_func_name: 组合搜索时，页面上生成显示的文本的函数
+                :param val_func_name: 组合搜索时，页面上生成的a标签中的值的函数
                 """
         self.field_name = field_name
         self.is_choice = is_choice
         self.is_multi = is_multi
         self.condition = condition
+        self.text_func_name = text_func_name
+        self.val_func_name = text_func_name
 
     # 针对外键和多对多 根据condition筛选出当前model对象所关联的其他model对象
     def get_queryset(self, _field):
@@ -36,22 +40,22 @@ class FilterOption(object):
     def get_choice(self, _field):
         return _field.choices
 
-class FilterRow(object):
-    def __init__(self,option,data,request):
-        self.option=option
-        self.data=data
-        self.request=request
 
+class FilterRow(object):
+    def __init__(self, option, data, request):
+        self.option = option
+        self.data = data
+        self.request = request
 
     def __iter__(self):
-        current_id=self.request.GET.get(self.option.field_name)
-        current_id_list=self.request.GET.getlist(self.option.field_name)
-        params=copy.deepcopy(self.request.GET)
-        params._mutable=True
+        current_id = self.request.GET.get(self.option.field_name)
+        current_id_list = self.request.GET.getlist(self.option.field_name)
+        params = copy.deepcopy(self.request.GET)
+        params._mutable = True
         if self.option.field_name in params:
-            #为了拼接全选url先给他删了后面加上
-            origin_list=params.pop(self.option.field_name)
-            url='{0}?{1}'.format(self.request.path_info,params.urlencode())
+            # 为了拼接全选url先给他删了后面加上
+            origin_list = params.pop(self.option.field_name)
+            url = '{0}?{1}'.format(self.request.path_info, params.urlencode())
 
             yield mark_safe('<a href="{0}">全选</a>'.format(url))
             params.setlist(self.option.field_name, origin_list)
@@ -61,38 +65,38 @@ class FilterRow(object):
 
         for val in self.data:
             if self.option.is_choice:
-                pk,text=str(val[0]),val[1]
+                pk, text = str(val[0]), val[1]
             else:
-                pk,text=str(val.pk),val
+                # pk,text=str(val.pk),val
+                # 当外键和M2M关联字段不是主键时就调用text_func_name和val_func_name方法,否则就单纯的是pk,text=str(val.pk),val
+                text = self.option.text_func_name(val) if self.option.text_func_name else str(val)
+                pk = str(self.option.val_func_name(val)) if self.option.val_func_name else str(val.pk)
 
-            if  not self.option.is_multi:
-                #单选
-                params[self.option.field_name]=pk
-                url='{0}?{1}'.format(self.request.path_info,params.urlencode())
-                if pk ==current_id:
-                    yield mark_safe('<a href="{0}" class="active">{1}</a>'.format(url,text))
+            if not self.option.is_multi:
+                # 单选
+                params[self.option.field_name] = pk
+                url = '{0}?{1}'.format(self.request.path_info, params.urlencode())
+                if pk == current_id:
+                    yield mark_safe('<a href="{0}" class="active">{1}</a>'.format(url, text))
                 else:
                     yield mark_safe('<a href="{0}">{1}</a>'.format(url, text))
 
             else:
-                #多选
-                _parms=copy.deepcopy(params)
-                id_list=_parms.getlist(self.option.field_name)
+                # 多选
+                _parms = copy.deepcopy(params)
+                id_list = _parms.getlist(self.option.field_name)
 
                 if pk in current_id_list:
-                    #删了以后当前已经选中的url里面没有自己的id了，目的是为了再点一次就取消
+                    # 删了以后当前已经选中的url里面没有自己的id了，目的是为了再点一次就取消
                     id_list.remove(pk)
-                    _parms.setlist(self.option.field_name,id_list)
-                    url='{0}?{1}'.format(self.request.path_info,_parms.urlencode())
-                    yield mark_safe('<a href="{0}" class="active">{1}</a>'.format(url,text))
+                    _parms.setlist(self.option.field_name, id_list)
+                    url = '{0}?{1}'.format(self.request.path_info, _parms.urlencode())
+                    yield mark_safe('<a href="{0}" class="active">{1}</a>'.format(url, text))
                 else:
                     id_list.append(pk)
-                    _parms.setlist(self.option.field_name,id_list)
+                    _parms.setlist(self.option.field_name, id_list)
                     url = '{0}?{1}'.format(self.request.path_info, _parms.urlencode())
                     yield mark_safe('<a href="{0}" >{1}</a>'.format(url, text))
-
-
-
 
 
 # 封装列表页面  因为列表页面代码太多啦 而却有好几个功能
@@ -189,22 +193,24 @@ class ChangeList(object):
             result.append(temp)
         return result
 
-    #
+    # 组合搜索实例化FilterRow
     def get_combine_seach_filter(self):
 
         for option in self.combine_seach:
+            # 获取字段
             _field = self.model_class._meta.get_field(option.field_name)
             if isinstance(_field, ForeignKey):
-                row=FilterRow(option,option.get_queryset(_field),self.request)
+                row = FilterRow(option, option.get_queryset(_field), self.request)
             elif isinstance(_field, ManyToManyField):
-                row=FilterRow(option,option.get_queryset(_field),self.request)
+                row = FilterRow(option, option.get_queryset(_field), self.request)
             else:
-                row=FilterRow(option,option.get_choice(_field),self.request)
+                row = FilterRow(option, option.get_choice(_field), self.request)
             yield row
 
 
 class StarkConfig(object):
     def __init__(self, model_class, site):
+        # 当前注册的Model类
         self.model_class = model_class
         self.site = site
 
@@ -295,7 +301,8 @@ class StarkConfig(object):
             # ----------------------------------------------联合搜索---------------------------------------
 
     combine_seach = []
-   #联合搜索对应额option对象list
+
+    # 联合搜索对应额option对象list
     def get_combine_seach(self):
         data = []
         if self.combine_seach:
@@ -416,21 +423,21 @@ class StarkConfig(object):
 
     # 字段列表展示页面视图函数
     def changlist_view(self, request, *args, **kwargs):
-        combine_search_condition={}
-        combine_search_list=self.get_combine_seach()
+        combine_search_condition = {}
+        combine_search_list = self.get_combine_seach()
         for key in request.GET.keys():
-            value_list=request.GET.getlist(key)
-            flag=False
+            value_list = request.GET.getlist(key)
+            flag = False
             for option in combine_search_list:
                 if option.field_name == key:
-                    flag=True
+                    flag = True
                     break
             if flag:
-                combine_search_condition['%s__in'%key]=value_list
-
+                combine_search_condition['%s__in' % key] = value_list
 
         # 获取当前类中的所有对象
-        data_list = self.model_class.objects.filter(self.get_search_condition()).filter(**combine_search_condition).all()
+        data_list = self.model_class.objects.filter(self.get_search_condition()).filter(
+            **combine_search_condition).all()
 
         if request.method == 'POST' and self.get_show_action():
             func_name_str = request.POST.get('list_action')
@@ -526,18 +533,18 @@ class StarkConfig(object):
             #
             #     new_form.append(temp)
 
-            #这段代码因为edit也要用 就抽取到了自定义标签中
+            # 这段代码因为edit也要用 就抽取到了自定义标签中
 
             return render(request, 'stark/add.html', {"form": form})
         else:
             form = AddForm(request.POST)
-            _popbackid=request.GET.get('_popbackid')
+            _popbackid = request.GET.get('_popbackid')
             if form.is_valid():
-                new_obj=form.save()
-                #如果是pop传回的
+                new_obj = form.save()
+                # 如果是pop传回的
                 if _popbackid:
-                    result={"id":new_obj.id,'text':str(new_obj),'popbackid':_popbackid}
-                    return render(request,'stark/popResponse.html',{"result":json.dumps(result,ensure_ascii=False)})
+                    result = {"id": new_obj.id, 'text': str(new_obj), 'popbackid': _popbackid}
+                    return render(request, 'stark/popResponse.html', {"result": json.dumps(result, ensure_ascii=False)})
                 return redirect(self.get_list_url())
             return render(request, 'stark/add.html', {"form": form})
 

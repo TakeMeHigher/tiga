@@ -1,0 +1,274 @@
+如何使用stark组件?
+1.在自己项目中的app中创建stark.py文件
+
+2.在stark.py中导入models和v1
+from stark.service import v1
+from app名称 import  models
+
+3.自定义 类名Config类 继承v1.StarkConfig
+class UserInfoConfig(v1.StarkConfig):
+    pass
+
+
+
+4.使用组件 具体使用根据以下示例来说
+a.models
+
+class Customer(models.Model):
+    """
+    客户表
+    """
+    qq = models.CharField(verbose_name='qq', max_length=64, unique=True, help_text='QQ号必须唯一')
+
+    name = models.CharField(verbose_name='学生姓名', max_length=16)
+    gender_choices = ((1, '男'), (2, '女'))
+    gender = models.SmallIntegerField(verbose_name='性别', choices=gender_choices)
+
+    education_choices = (
+        (1, '重点大学'),
+        (2, '普通本科'),
+        (3, '独立院校'),
+        (4, '民办本科'),
+        (5, '大专'),
+        (6, '民办专科'),
+        (7, '高中'),
+        (8, '其他')
+    )
+    education = models.IntegerField(verbose_name='学历', choices=education_choices, blank=True, null=True, )
+    graduation_school = models.CharField(verbose_name='毕业学校', max_length=64, blank=True, null=True)
+    major = models.CharField(verbose_name='所学专业', max_length=64, blank=True, null=True)
+
+    experience_choices = [
+        (1, '在校生'),
+        (2, '应届毕业'),
+        (3, '半年以内'),
+        (4, '半年至一年'),
+        (5, '一年至三年'),
+        (6, '三年至五年'),
+        (7, '五年以上'),
+    ]
+    experience = models.IntegerField(verbose_name='工作经验', blank=True, null=True, choices=experience_choices)
+    work_status_choices = [
+        (1, '在职'),
+        (2, '无业')
+    ]
+    work_status = models.IntegerField(verbose_name="职业状态", choices=work_status_choices, default=1, blank=True,
+                                      null=True)
+    company = models.CharField(verbose_name="目前就职公司", max_length=64, blank=True, null=True)
+    salary = models.CharField(verbose_name="当前薪资", max_length=64, blank=True, null=True)
+
+    source_choices = [
+        (1, "qq群"),
+        (2, "内部转介绍"),
+        (3, "官方网站"),
+        (4, "百度推广"),
+        (5, "360推广"),
+        (6, "搜狗推广"),
+        (7, "腾讯课堂"),
+        (8, "广点通"),
+        (9, "高校宣讲"),
+        (10, "渠道代理"),
+        (11, "51cto"),
+        (12, "智汇推"),
+        (13, "网盟"),
+        (14, "DSP"),
+        (15, "SEO"),
+        (16, "其它"),
+    ]
+    source = models.SmallIntegerField('客户来源', choices=source_choices, default=1)
+    referral_from = models.ForeignKey(
+        'self',
+        blank=True,
+        null=True,
+        verbose_name="转介绍自学员",
+        help_text="若此客户是转介绍自内部学员,请在此处选择内部学员姓名",
+        related_name="internal_referral"
+    )
+    course = models.ManyToManyField(verbose_name="咨询课程", to="Course")
+
+    status_choices = [
+        (1, "已报名"),
+        (2, "未报名")
+    ]
+    status = models.IntegerField(
+        verbose_name="状态",
+        choices=status_choices,
+        default=2,
+        help_text=u"选择客户此时的状态"
+    )
+    consultant = models.ForeignKey(verbose_name="课程顾问", to='UserInfo', related_name='consultant',limit_choices_to={'depart_id':1001})
+    date = models.DateField(verbose_name="咨询日期", auto_now_add=True)
+    last_consult_date = models.DateField(verbose_name="最后跟进日期", auto_now_add=True)
+
+    def __str__(self):
+        return "姓名:{0},QQ:{1}".format(self.name, self.qq, )
+
+b.具体使用
+1.list_dispaly:
+   代表自己想在页面展示的字段,想展示的页面就在list_dispaly=[]中加上，不想展示就不需要加,其中choices和M2M一定要自定义函数
+,至于Fk,可自定义也可直接写,根据需求而定,具体怎么定义看下面，然后在 list_dispaly=[]中加入函数名即可
+
+2.
+ show_search_form
+   是否显示搜索框 默认false 如果想展示 show_search_form=True即可
+ search_fileds
+    以那些字段为搜索依据 也就是说我们搜索是根据那几个字段的值来搜索，在search_fileds=[]中加上 搜索字段__contains即可
+    注意: search_fileds中 不要放 FK,M2M,choices 字段
+
+3.
+  show_action
+  是否显示action(批量操作),默认False,想显示的话 设置成True即可
+  action_func_list[函数名，函数名],用法见下面,类似批量删除
+
+  def multi_del(self, request):
+        id_list = request.POST.getlist('pk')
+        # print(id_list,'****------')
+        self.model_class.objects.filter(id__in=id_list).delete()
+        return redirect(self.get_list_url())
+
+  multi_del.short_desc = '批量删除'
+
+  def multi_info(self, request):
+        pass
+
+  multi_info.short_desc = '批量初始化'
+
+  action_func_list = [multi_del, multi_info]
+
+
+4.
+  show_combine_seach
+   是否显示组合搜索 默认False 想显示改为True即可
+  combine_seach
+  里面放v1.FilterOption()示例对象用法见下面
+
+5.extra_url
+ 自定义额外的url 要在里面自己写是视图函数 用法见下面
+
+6 自定义Form组件
+   model_class_form=自定义Form类名
+7.重写v1.StarkConfig 里面的 函数和字段
+  
+
+
+
+
+#示例
+class CustomerConfig(v1.StarkConfig):
+    def gender_dispaly(self,obj=None,is_head=False):
+        if is_head:
+            return '性别'
+        return obj.get_gender_display()
+
+    def education_dispaly(self,obj=None,is_head=False):
+        if is_head:
+            return '学历'
+        return obj.get_education_display()
+
+    def experience_dispaly(self,obj=None,is_head=False):
+        if is_head:
+            return '工作经验'
+        return obj.get_experience_display()
+
+    def work_status_dispaly(self,obj=None,is_head=False):
+        if is_head:
+            return '职业状态'
+        return obj.get_work_status_display()
+
+
+    def source_dispaly(self,obj=None,is_head=False):
+        if is_head:
+            return '客户来源'
+        return obj.get_source_display()
+
+
+
+    def referral_from_dispaly(self,obj=None,is_head=False):
+        if is_head:
+            return '转介绍自学员'
+        return obj.referral_from.name
+
+
+    def consultant_dispaly(self,obj=None,is_head=False):
+        if is_head:
+            return '课程顾问'
+        return obj.consultant.name
+
+
+    def course_dispaly(self,obj=None,is_head=False):
+        if is_head:
+            return '咨询课程'
+        courses= obj.course.all()
+        l=[]
+        for course in courses:
+            html='<div style="display:inline-block;padding:3px 5px;border:1px solid blue;margin:2px;">%s<a href="/stark/app01/customer/%s/%s/delete_cource/" >X</a></div>'%(course.name,obj.pk,course.pk)
+            l.append(html)
+        return mark_safe(''.join(l))
+
+
+    def record_display(self,obj=None,is_head=False):
+        if is_head:
+            return '跟进记录'
+        return  mark_safe('<a href="/stark/app01/consultrecord/?customer=%s">查看跟进记录</a>'%(obj.pk))
+
+
+
+
+
+    list_display = ['qq','name',gender_dispaly,education_dispaly,'graduation_school','major',experience_dispaly,work_status_dispaly,'company','salary',source_dispaly
+                    ,course_dispaly,'status',consultant_dispaly,record_display
+                    ]
+
+    show_search_form = True
+    search_fileds = ['qq__contains','name__contains','graduation_school__contains','major__contains','company__contains','salary__contains']
+
+    show_action = True
+
+    def multi_del(self, request):
+        id_list = request.POST.getlist('pk')
+        # print(id_list,'****------')
+        self.model_class.objects.filter(id__in=id_list).delete()
+        return redirect(self.get_list_url())
+
+    multi_del.short_desc = '批量删除'
+
+    def multi_info(self, request):
+        pass
+
+    multi_info.short_desc = '批量初始化'
+
+    action_func_list = [multi_del, multi_info]
+
+
+    combine_seach = [
+        v1.FilterOption('gender',is_choice=True),
+        v1.FilterOption('education',is_choice=True),
+        v1.FilterOption('experience',is_choice=True),
+        v1.FilterOption('work_status',is_choice=True),
+        v1.FilterOption('course',is_multi=True),
+        v1.FilterOption('source',is_choice=True),
+        v1.FilterOption('status',is_choice=True),
+        v1.FilterOption('consultant'),
+    ]
+
+#额外自定义url视图函数
+    def delete_cource(self,request,customer_id,course_id):
+        customer=self.model_class.objects.filter(pk=customer_id).first()
+        customer.course.remove(course_id)
+        menu=self.request.GET.urlencode()
+        print(menu)
+        params=QueryDict(mutable=True)
+        params[self.search_key]=menu
+        print(params,'----------------------++++++++++++')
+        url='%s?%s'%(self.get_list_url(),params.urlencode())
+        return redirect(url)
+
+
+
+#额外自定义url
+    def extra_url(self):
+        app_model_class=self.model_class._meta.app_label,self.model_class._meta.model_name
+        patterns=[
+            url(r'^(\d+)/(\d+)/delete_cource/$',self.wrap(self.delete_cource),name='%s_%s_dc'%app_model_class)
+        ]
+        return patterns
